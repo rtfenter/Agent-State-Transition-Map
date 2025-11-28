@@ -20,7 +20,7 @@ The map is intentionally small and easy to extend.
 
 ## Features (MVP)
 
-The first version will include:
+This prototype includes:
 
 - Inputs for **task**, **conditions**, and **rules**  
 - A visual **state node + transitions** map  
@@ -39,7 +39,8 @@ The first version will include:
 
 ## Demo Screenshot
 
-_Screenshot placeholder until UI is ready_
+
+<img width="2806" height="2330" alt="Screenshot 2025-11-28 at 16-01-44 Agent State Transition Map" src="https://github.com/user-attachments/assets/e5ccb72e-04d4-4357-b7ca-003f73753e6f" />
 
 ---
 
@@ -122,7 +123,7 @@ https://github.com/rtfenter/Applied-Intelligence-Systems-Series
 
 ## Status
 
-MVP planned.  
+MVP is implemented and active.  
 The focus is on clearly visualizing transitions and failure paths, not simulating a full production agent.
 
 ---

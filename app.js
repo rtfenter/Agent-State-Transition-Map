@@ -1,6 +1,5 @@
-const taskInput = document.getElementById("task-input");
-const conditionsInput = document.getElementById("conditions-input");
-const rulesInput = document.getElementById("rules-input");
+const scenarioSelect = document.getElementById("scenario-select");
+const scenarioDescriptionEl = document.getElementById("scenario-description");
 
 const toggleMissing = document.getElementById("toggle-missing");
 const toggleConflict = document.getElementById("toggle-conflict");
@@ -25,6 +24,48 @@ const stateNodes = {
   end_degraded: document.getElementById("state-end-degraded"),
   end_failed: document.getElementById("state-end-failed")
 };
+
+// Scenario presets
+const SCENARIOS = {
+  incident: {
+    id: "incident",
+    label: "Incident escalation assistant",
+    task: "Monitor alerts, group related signals, and draft an incident summary for the on-call engineer.",
+    conditions:
+      "Alerts can be noisy; log streams may be delayed; ticketing system is usually available but occasionally slow.",
+    rules:
+      "Never close an incident without a ticket, never hide high-severity alerts, and always highlight uncertainty explicitly.",
+    description:
+      "Agent triages incidents from alerts, gathers context, and escalates to the on-call engineer with a summary."
+  },
+  customer_email: {
+    id: "customer_email",
+    label: "Customer follow-up agent",
+    task: "Draft follow-up emails after support tickets are resolved, summarizing actions taken and next steps.",
+    conditions:
+      "Support notes vary in quality; CRM data may be incomplete; customers may have multiple open tickets.",
+    rules:
+      "Do not promise features or timelines, keep tone calm and professional, and link back to the original ticket.",
+    description:
+      "Agent reads support notes and CRM data, then drafts a follow-up email that explains what happened and what’s next."
+  },
+  data_cleanup: {
+    id: "data_cleanup",
+    label: "Data quality repair agent",
+    task: "Scan recent records for anomalies, flag likely data issues, and generate safe, reviewable fixes.",
+    conditions:
+      "Source tables come from multiple pipelines; some fields are sparsely populated; schemas evolve over time.",
+    rules:
+      "Never hard-delete data, never infer sensitive fields, and always produce a reversible, auditable change set.",
+    description:
+      "Agent inspects recent data, proposes corrections, and prepares a change set for human review before applying fixes."
+  }
+};
+
+function getSelectedScenario() {
+  const key = scenarioSelect.value || "incident";
+  return SCENARIOS[key] || SCENARIOS.incident;
+}
 
 function setStatus(text) {
   statusEl.textContent = text || "";
@@ -64,19 +105,13 @@ function resetStateHighlights() {
 
 // Compute scenario path based on toggles
 function computeScenario({ missing, conflict, timeout, invalid }) {
-  // Base path and outcome
-  // We choose one dominant pattern to keep it legible.
   if (!missing && !conflict && !timeout && !invalid) {
     return {
       outcomeType: "normal",
       outcomeLabel: "Normal path — task completed without major failures.",
       summaryText:
         "Agent followed the happy path: it processed the task under current conditions and reached a clean end state.",
-      path: [
-        "initial",
-        "processing",
-        "end_ok"
-      ]
+      path: ["initial", "processing", "end_ok"]
     };
   }
 
@@ -86,13 +121,7 @@ function computeScenario({ missing, conflict, timeout, invalid }) {
       outcomeLabel: "Invalid state — agent reached an impossible or undefined state.",
       summaryText:
         "The agent transitioned into a state that should never be reachable. In real systems this often exposes design gaps, missing invariants, or unhandled edge cases.",
-      path: [
-        "initial",
-        "processing",
-        "error",
-        "fallback",
-        "end_failed"
-      ]
+      path: ["initial", "processing", "error", "fallback", "end_failed"]
     };
   }
 
@@ -102,13 +131,7 @@ function computeScenario({ missing, conflict, timeout, invalid }) {
       outcomeLabel: "Timeout-driven fallback — task completed via degraded path.",
       summaryText:
         "Slow or unavailable dependencies forced the agent into a timeout state, then through fallback and recovery to reach a degraded but acceptable outcome.",
-      path: [
-        "initial",
-        "timeout",
-        "fallback",
-        "recovery",
-        "end_degraded"
-      ]
+      path: ["initial", "timeout", "fallback", "recovery", "end_degraded"]
     };
   }
 
@@ -118,13 +141,7 @@ function computeScenario({ missing, conflict, timeout, invalid }) {
       outcomeLabel: "Conflicting and incomplete inputs — agent relied heavily on fallback.",
       summaryText:
         "The agent detected both missing data and conflicting rules, leading to an error and heavy use of fallback / recovery logic. It reached a degraded end state that should be flagged for review.",
-      path: [
-        "initial",
-        "error",
-        "fallback",
-        "recovery",
-        "end_degraded"
-      ]
+      path: ["initial", "error", "fallback", "recovery", "end_degraded"]
     };
   }
 
@@ -134,13 +151,7 @@ function computeScenario({ missing, conflict, timeout, invalid }) {
       outcomeLabel: "Missing or partial data — degraded success via fallback.",
       summaryText:
         "The agent detected incomplete inputs and moved into an error branch. Fallback and recovery logic allowed it to produce a partial or caveated result instead of silently failing.",
-      path: [
-        "initial",
-        "error",
-        "fallback",
-        "recovery",
-        "end_degraded"
-      ]
+      path: ["initial", "error", "fallback", "recovery", "end_degraded"]
     };
   }
 
@@ -150,42 +161,26 @@ function computeScenario({ missing, conflict, timeout, invalid }) {
       outcomeLabel: "Conflicting rules — agent resolved tension via fallback.",
       summaryText:
         "Conflicting rules or instructions pushed the agent into an error state. Fallback logic (e.g., escalation or explicit tie-breaking) allowed it to reach a degraded but consistent end state.",
-      path: [
-        "initial",
-        "processing",
-        "error",
-        "fallback",
-        "recovery",
-        "end_degraded"
-      ]
+      path: ["initial", "processing", "error", "fallback", "recovery", "end_degraded"]
     };
   }
 
-  // Fallback (should not be hit given branches above)
   return {
     outcomeType: "failed",
     outcomeLabel: "Uncategorized failure.",
     summaryText:
       "The agent encountered a scenario that was not explicitly modeled. In practice, this would indicate a gap in the state machine design.",
-    path: [
-      "initial",
-      "error",
-      "end_failed"
-    ]
+    path: ["initial", "error", "end_failed"]
   };
 }
 
 // Render the state trace list
 function renderTrace(path, meta) {
-  const task = taskInput.value.trim();
-  const conditions = conditionsInput.value.trim();
-  const rules = rulesInput.value.trim();
+  const scenario = getSelectedScenario();
 
-  const taskSnippet = task || "No explicit task provided.";
-  const conditionsSnippet =
-    conditions || "No additional conditions or environment context specified.";
-  const rulesSnippet =
-    rules || "No explicit rules or policies provided.";
+  const taskSnippet = scenario.task;
+  const conditionsSnippet = scenario.conditions;
+  const rulesSnippet = scenario.rules;
 
   const items = [];
 
@@ -196,39 +191,48 @@ function renderTrace(path, meta) {
     switch (stateKey) {
       case "initial":
         label = "Initial State";
-        detail = `Agent receives the task and builds an internal view of context and rules.`;
+        detail =
+          "Agent receives the scenario task and builds an internal view of context and rules.";
         break;
       case "processing":
         label = "Next / Processing State";
-        detail = `Agent is executing the task using the provided conditions and rules.`;
+        detail =
+          "Agent is executing the task using the scenario’s conditions and rules.";
         break;
       case "timeout":
         label = "Timeout State";
-        detail = `A dependency (API, database, external tool) is too slow or unresponsive, so progress is blocked.`;
+        detail =
+          "A dependency (API, database, external tool) is too slow or unresponsive, so progress is blocked.";
         break;
       case "error":
         label = "Error State";
-        detail = `The agent detects a hard failure: missing inputs, conflicting rules, or an invalid transition.`;
+        detail =
+          "The agent detects a hard failure: missing inputs, conflicting rules, or an invalid transition.";
         break;
       case "fallback":
         label = "Fallback Handler";
-        detail = `Fallback logic activates: retrying, switching to degraded mode, or escalating to a human.`;
+        detail =
+          "Fallback logic activates: retrying, switching to degraded mode, or escalating to a human.";
         break;
       case "recovery":
         label = "Recovery / Retry";
-        detail = `With fallback applied, the agent retries the task or continues with reduced scope.`;
+        detail =
+          "With fallback applied, the agent retries the task or continues with reduced scope.";
         break;
       case "end_ok":
         label = "End State — Normal Completion";
-        detail = `The agent finishes the task as intended, with no major drift or unresolved errors.`;
+        detail =
+          "The agent finishes the task as intended, with no major drift or unresolved errors.";
         break;
       case "end_degraded":
         label = "End State — Degraded Success";
-        detail = `The agent completes the task with known limitations (partial output, manual intervention, or degraded mode).`;
+        detail =
+          "The agent completes the task with known limitations (partial output, manual intervention, or degraded mode).";
         break;
       case "end_failed":
         label = "End State — Failed / Stalled";
-        detail = `The agent cannot safely complete the task and stops. This path signals a design or architecture problem to fix.`;
+        detail =
+          "The agent cannot safely complete the task and stops. This path signals a design or architecture problem to fix.";
         break;
       default:
         label = stateKey;
@@ -239,6 +243,7 @@ function renderTrace(path, meta) {
 
     if (index === 0) {
       extra = `<div class="trace-extra">
+        <strong>Scenario:</strong> ${scenario.label}<br />
         <strong>Task:</strong> ${taskSnippet}<br />
         <strong>Conditions:</strong> ${conditionsSnippet}<br />
         <strong>Rules:</strong> ${rulesSnippet}
@@ -273,22 +278,25 @@ function highlightPath(path) {
 
 // Generate interpretation notes based on the scenario
 function generateNotes(meta, toggles) {
+  const scenario = getSelectedScenario();
   const pieces = [];
+
+  pieces.push(`Scenario: ${scenario.label}.`);
 
   switch (meta.outcomeType) {
     case "normal":
       pieces.push(
-        "This scenario illustrates the clean, happy-path behavior: the agent transitions from Initial → Processing → End without encountering failures."
+        "This run illustrates the clean, happy-path behavior: the agent transitions from Initial → Processing → End without encountering failures."
       );
       break;
     case "degraded":
       pieces.push(
-        "This scenario shows how the agent relies on fallback and recovery logic to avoid a hard failure."
+        "This run shows how the agent relies on fallback and recovery logic to avoid a hard failure."
       );
       break;
     case "failed":
       pieces.push(
-        "This scenario highlights a hard failure path — the agent cannot safely complete the task and ends in a failed state."
+        "This run highlights a hard failure path — the agent cannot safely complete the task and ends in a failed state."
       );
       break;
   }
@@ -324,10 +332,14 @@ function generateNotes(meta, toggles) {
   return pieces.join(" ");
 }
 
+// Scenario description sync
+function updateScenarioDescription() {
+  const scenario = getSelectedScenario();
+  scenarioDescriptionEl.textContent = scenario.description;
+}
+
 // Main handler
 runTraceBtn.addEventListener("click", () => {
-  const task = taskInput.value.trim();
-
   const toggles = {
     missing: toggleMissing.checked,
     conflict: toggleConflict.checked,
@@ -335,16 +347,8 @@ runTraceBtn.addEventListener("click", () => {
     invalid: toggleInvalid.checked
   };
 
-  if (!task) {
-    setStatus("Add at least a simple task description to make the trace meaningful.");
-    summaryWarn("No task provided — the state machine exists, but we don’t know what the agent is trying to do.");
-  } else {
-    setStatus("");
-  }
-
   const scenarioMeta = computeScenario(toggles);
 
-  // Update summary badge
   if (scenarioMeta.outcomeType === "normal") {
     summaryOk(scenarioMeta.outcomeLabel);
   } else if (scenarioMeta.outcomeType === "degraded") {
@@ -353,16 +357,32 @@ runTraceBtn.addEventListener("click", () => {
     summaryWarn(scenarioMeta.outcomeLabel);
   }
 
-  // Highlight states and render trace
   highlightPath(scenarioMeta.path);
   renderTrace(scenarioMeta.path, scenarioMeta);
 
-  // Interpretation notes
   const notes = generateNotes(scenarioMeta, toggles);
   notesTextEl.textContent = notes;
+
+  setStatus(
+    "Trace generated for: " +
+      getSelectedScenario().label +
+      " (toggles applied: " +
+      Object.entries(toggles)
+        .filter(([_, v]) => v)
+        .map(([k]) => k)
+        .join(", ") +
+      (Object.values(toggles).some(Boolean) ? ")" : "none)")
+  );
 });
 
-// Initial summary
+// Update description when scenario changes
+scenarioSelect.addEventListener("change", () => {
+  updateScenarioDescription();
+  setStatus("Scenario changed. Run a new trace to see the updated path.");
+});
+
+// Initial UI state
+updateScenarioDescription();
 summaryIdle(
-  "No trace yet. Define a task, toggle conditions, then click Run State Trace to see how the agent moves through states."
+  "No trace yet. Choose a scenario, toggle conditions, then click Run State Trace to see how the agent moves through states."
 );

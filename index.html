@@ -17,47 +17,26 @@
   </header>
 
   <main class="main">
-    <!-- Left: Inputs -->
+    <!-- Left: Scenario + Toggles -->
     <section class="panel panel-input">
       <div class="panel-header">
-        <h2>Task, Conditions & Rules</h2>
+        <h2>Scenario & Conditions</h2>
       </div>
 
       <p class="help-text">
-        Define the agent’s task, environment conditions, and rules. Then toggle failure modes to see how the state path changes.
+        Pick a scenario and toggle failure modes. The map will highlight how the agent moves through its state machine.
       </p>
 
       <div class="field">
-        <label for="task-input">Task</label>
-        <textarea
-          id="task-input"
-          class="text-input"
-          rows="3"
-          spellcheck="false"
-          placeholder="Example: Draft a summary email about this incident and notify the on-call engineer."
-        ></textarea>
-      </div>
-
-      <div class="field">
-        <label for="conditions-input">Conditions / Context</label>
-        <textarea
-          id="conditions-input"
-          class="text-input"
-          rows="3"
-          spellcheck="false"
-          placeholder="Example: Logs are delayed by 2 minutes; ticket system is available; user provided partial details."
-        ></textarea>
-      </div>
-
-      <div class="field">
-        <label for="rules-input">Key Rules / Policies</label>
-        <textarea
-          id="rules-input"
-          class="text-input"
-          rows="3"
-          spellcheck="false"
-          placeholder="Example: Never close an incident without a ticket; escalate to human if data is missing or inconsistent."
-        ></textarea>
+        <label for="scenario-select">Scenario</label>
+        <select id="scenario-select" class="select-input">
+          <option value="incident" selected>Incident escalation assistant</option>
+          <option value="customer_email">Customer follow-up agent</option>
+          <option value="data_cleanup">Data quality repair agent</option>
+        </select>
+        <p id="scenario-description" class="scenario-description">
+          Agent triages incidents from alerts, gathers context, and escalates to the on-call engineer with a summary.
+        </p>
       </div>
 
       <div class="variation-settings">
@@ -119,7 +98,7 @@
 
       <div id="summary" class="summary">
         <div class="summary-badge summary-badge-idle">
-          No trace yet. Define a task, toggle conditions, then click <strong>Run State Trace</strong>.
+          No trace yet. Choose a scenario, toggle conditions, then click <strong>Run State Trace</strong>.
         </div>
       </div>
 
@@ -163,7 +142,7 @@
           <div class="state-node state-node-fallback" id="state-fallback">
             <div class="state-node-label">Fallback Handler</div>
             <div class="state-node-body">
-              Recovery logic: retries, degraded mode, escalation, or human handoff.
+              Recovery logic: retries, degraded modes, escalation, or human handoff.
             </div>
           </div>
 
